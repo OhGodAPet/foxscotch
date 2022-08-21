@@ -166,7 +166,7 @@ ssize_t loop2_offset_show(struct device *dev, struct device_attribute *attr, cha
 	AMDI2CReadByte(client, 0xE2, &OffsetVID);
 	
 	// Convert from VID to mV, preserving sign
-	Result = OffsetVID * drvdata->L2VIDStep;
+	Result = (OffsetVID * 6250) / 1000;
 	
 	return(sprintf(buf, "%d\n", Result));
 }
@@ -202,7 +202,7 @@ ssize_t loop1_offset_store(struct device *dev, struct device_attribute *attr,
 	
 	printk(KERN_INFO "Got %ld as argument.\n", arg);
 	
-	VID = arg / drvdata->L2VIDStep;
+	VID = (arg * 1000) / 6250;
 	
 	printk(KERN_INFO "Would write VID 0x%02X\n", VID);
 	
@@ -552,6 +552,15 @@ int ir35217_detect(struct i2c_client *client, struct i2c_board_info *info)
 	if(byte0 != INFINEON_SALEM_I2C_MODEL_IR35217)
 	{
 		printk(KERN_DEBUG "Device at 0x%04X might be an Infineon device, but it's not an IR35217.\n", client->addr);
+		return(-ENODEV);
+	}
+	
+	// It is definitely an IR35217; make sure it's in AMD mode
+	AMDI2CReadByte(client, 0x27, &byte0);
+	
+	if(!((byte0 >> 5) & 1))
+	{
+		printk(KERN_INFO "Found an IR35217 at 0x%04X, but it is not in AMD mode! Skipping.\n", client->addr);
 		return(-ENODEV);
 	}
 
